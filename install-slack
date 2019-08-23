@@ -1,0 +1,49 @@
+#!/bin/bash
+
+#quit Slack
+sudo killall "Slack"
+
+
+#gets current logged in user
+consoleuser=$(ls -l /dev/console | cut -d " " -f4)
+
+APP_NAME="Slack.app"
+APP_PATH="/Applications/$APP_NAME"
+APP_VERSION_KEY="CFBundleShortVersionString"
+
+
+DOWNLOAD_URL="https://slack.com/ssb/download-osx"
+finalDownloadUrl=$(curl "$DOWNLOAD_URL" -s -L -I -o /dev/null -w '%{url_effective}')
+dmgName=$(printf "%s" "${finalDownloadUrl[@]}" | sed 's@.*/@@')
+slackDmgPath="/tmp/$dmgName"
+
+
+# Remove the existing Application
+rm -rf /Applications/Slack.app
+
+#downloads latest version of Slack
+curl -L -o "$slackDmgPath" "$finalDownloadUrl"
+
+#mount the .dmg
+hdiutil attach -nobrowse $slackDmgPath
+
+#Copy the update app into applications folder
+sudo cp -R /Volumes/Slack*/Slack.app /Applications
+
+#unmount and eject dmg
+mountName=$(diskutil list | grep Slack | awk '{ print $3 }')
+umount -f /Volumes/Slack*/
+diskutil eject $mountName
+
+#clean up /tmp download
+rm -rf "$slackDmgPath"
+
+# change permissions so Slack can update
+sudo chown -R $consoleuser:staff "/Applications/Slack.app"
+
+
+#write defaults on version >4.0 to not auto updateredbox andreoid a
+defaults write com.tinyspeck.slackmacgap SlackNoAutoUpdates -bool YES
+
+#Relaunch Slack
+open -a /Applications/Slack.app
